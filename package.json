@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "dev": "node src/index.js"
+  },
+  "dependencies": {
+    "cli-table": "^0.3.11",
+    "elliptic": "^6.6.1",
+    "vorpal": "^1.12.0"
+  }
+}
