@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const dgram = require('dgram');
+const rsa = require('./res')
 
 const initBlock = {
   index: 0,
@@ -15,6 +16,7 @@ class Blockchain {
     this.blockchain = [initBlock];
     this.data = [];
     this.difficulty = 2;
+    this.remote = {};
     // 所有网络节点信息
     this.peers = [];
     // 种子节点
@@ -37,7 +39,6 @@ class Blockchain {
       //   type:
       //   data:
       // }
-      console.log('接收到消息：',action)
       if (action.type) {
         this.dispatch(action, { address, port });
       }
@@ -69,7 +70,6 @@ class Blockchain {
     }
   }
   send(message, port, host) {
-    console.log('send:' + message.type + ', ' + host + ':' + port);
     this.udp.send(JSON.stringify(message), port, host);
   }
 
@@ -77,7 +77,41 @@ class Blockchain {
     // 接收网络消息
     switch (action.type) {
       case 'newPeer':
+        // 接入节点
+        // 1. ip+port
+        this.send({
+          type: 'remoteAddress',
+          data: remote,
+        }, remote.port, remote.address);
+        // 2. 当前的所有节点
+        this.send({
+          type: 'peersList',
+          data: this.peers,
+        }, remote.port, remote.address);
+        // 3. 广播所有节点
+        this.boardcast({
+          type: "sayhi",
+          data: remote
+        })
+
+
+        this.peers.push(remote);
         console.log('new peer', remote);
+        break;
+      case 'remoteAddress':
+        this.remote = action.data;
+        break;
+      case 'peersList':
+        const newPeers = action.data;
+        this.addPeers(newPeers)
+        break;
+      case 'sayhi':
+        let remotePeer = action.data;
+        console.log("【信息】新朋友你好，相识就是缘分")
+        this.send({ type: 'hi' }, remotePeer.port, remote.address)
+        break;
+      case 'hi':
+        console.log(`${remote.address}:${remote.port} : ${action.data}`)
         break;
       case 'exit':
         console.log('exit', remote);
@@ -85,6 +119,25 @@ class Blockchain {
       default:
         console.log('未定义类型的消息');
     }
+  }
+
+  // 广播
+  boardcast(action) {
+    this.peers.forEach(v => {
+      this.send(action, v.port, v.address)
+    })
+  }
+
+  isEqualPeer(peer1, peer2) {
+    return pee1.address == peer2.address && peer1.port == peer2.port
+  }
+
+  addPeers(newPeers) {
+    newPeers.forEach(peer => {
+      if (!this.peers.find(v => this.isEqualPeer(peer, v))) {
+        this.peers.push(peer)
+      }
+    })
   }
 
   bindExit() {
@@ -118,12 +171,19 @@ class Blockchain {
       }
     }
     // 签名校验
-    const tranObj = { from, to, amount };
-    this.data.push(tranObj);
-    return tranObj;
+    // const tranObj = { from, to, amount };
+    const sig = rsa.sign({ from, to, amount })
+    const sigTrans = { from, to, amount, sig }
+    this.data.push(sigTrans);
+    return sigTrans;
   }
 
-  // 查看余额
+  isValidaTrans(trans){
+    // 是不是合法交易
+    return rsa.verify(trans,trans.from)
+  }
+
+  // 查看余额p
   blance(address) {
     let blance = 0;
     this.blockchain.forEach((block) => {
@@ -144,6 +204,15 @@ class Blockchain {
 
   // 挖矿
   mine(address) {
+    // 校验所有交易的合法性
+    // if (!this.data.every(v => this.isValidaTrans(v))){
+    //   console.log("trans not vaild")
+    //   return
+    // }
+    // 过滤不合法交易
+    this.data = this.data.filter(v => this.isValidaTrans(v))
+
+    this.isValidaTrans()
     this.transfer('0', address, 100);
     // 1.生成新区块
     // 2.计算哈希 (直到计算出的哈希符合条件)

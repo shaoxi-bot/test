@@ -3,6 +3,7 @@
 // 3. 公钥可以通过私钥计算得出
 var EC = require('elliptic').ec;
 var fs = require('fs');
+const { Mode } = require('vorpal');
 var ec = new EC('secp256k1');
 
 var keypair = ec.genKeyPair();
@@ -53,10 +54,12 @@ function verify({ from, to, amount, signature }, pub) {
 }
 const keys = generateKeys();
 
-const trans = { from: 'woniu', to: 'imooc', amount: 100 };
-const trans1 = {from:"woniu1",to:"imooc",amount:100}
-const signature = sign(trans);
-console.log(signature);
-console.log(
-  verify({ from: 'woniu', to: 'imooc', amount: 100, signature }, keys.pub),
-);
+// const trans = { from: 'woniu', to: 'imooc', amount: 100 };
+// const trans1 = {from:"woniu1",to:"imooc",amount:100}
+// const signature = sign(trans);
+// console.log(signature);
+// console.log(
+//   verify({ from: 'woniu', to: 'imooc', amount: 100, signature }, keys.pub),
+// );
+
+module.exports = {sign,verify,keys}
