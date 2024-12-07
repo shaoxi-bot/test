@@ -5,6 +5,9 @@ const rsa = require("./res")
 const blockchain = new Blockchain();
 
 function formatLog(data) {
+  if (!data || data.length === 0) {
+    return
+  }
   if (!Array.isArray(data)) {
     data = [data];
   }
@@ -12,6 +15,7 @@ function formatLog(data) {
   const header = Object.keys(first);
   const table = new Table({
     head: header,
+    colWidths: new Array(header.length).fill(15),
   });
   const res = data.map((v) => {
     return header.map((h) => JSON.stringify(v[h], null, 1));
@@ -31,13 +35,25 @@ vorpal.command('mine', '挖矿').action(function (args, callback) {
   }
   callback();
 });
-vorpal.command('chain', '查看区块链').action(function (args, callback) {
+vorpal.command('blackchain', '查看区块链').action(function (args, callback) {
   formatLog(blockchain.blockchain);
   callback();
 });
 vorpal.command('pub', '查看本地地址').action(function (args, callback) {
   // formatLog();
   this.log(rsa.keys.pub)
+  callback();
+});
+vorpal.command('peers', '查看网络节点列表').action(function (args, callback) {
+  formatLog(blockchain.peers);
+  callback();
+});
+vorpal.command('chat <msg>', '向网络节点广播消息').action(function (args, callback) {
+  blockchain.boardcast({ type: 'hi', data: args.msg });
+  callback();
+});
+vorpal.command('pending', '查看未打包的交易').action(function (args, callback) {
+  formatLog(blockchain.data);
   callback();
 });
 vorpal

@@ -40,26 +40,27 @@ function generateKeys() {
 }
 
 // 签名
-function sign({ from, to, amount }) {
-  const bufferMsg = Buffer.from(`${from}-${to}-${amount}`);
+function sign({ from, to, amount, timestamp }) {
+  const bufferMsg = Buffer.from(`${timestamp}-${amount}-${from}-${to}`);
   let signature = Buffer.from(keypair.sign(bufferMsg).toDER()).toString('hex');
   return signature;
 }
 
 // 校验签名
-function verify({ from, to, amount, signature }, pub) {
+function verify({ from, to, amount, timestamp, signature }, pub) {
   const keypairTemp = ec.keyFromPublic(pub, 'hex');
-  const bufferMsg = Buffer.from(`${from}-${to}-${amount}`);
+  const bufferMsg = Buffer.from(`${timestamp}-${amount}-${from}-${to}`)
   return keypairTemp.verify(bufferMsg, signature);
 }
 const keys = generateKeys();
 
 // const trans = { from: 'woniu', to: 'imooc', amount: 100 };
 // const trans1 = {from:"woniu1",to:"imooc",amount:100}
+// const trans = { from: '04547a144bfba29f3f375052c69ff16c58ad93ff643d70240d1eade553f056b93b078471f1e43d71ce695fc63cc9fe80c14ab8087d178cf74d316911ff83b17495', to: 'imooc', amount: 100 };
 // const signature = sign(trans);
 // console.log(signature);
 // console.log(
-//   verify({ from: 'woniu', to: 'imooc', amount: 100, signature }, keys.pub),
+//   verify({ from: '04547a144bfba29f3f375052c69ff16c58ad93ff643d70240d1eade553f056b93b078471f1e43d71ce695fc63cc9fe80c14ab8087d178cf74d316911ff83b17495', to: 'imooc', amount: 100, signature }, keys.pub),
 // );
 
-module.exports = {sign,verify,keys}
+module.exports = { sign, verify, keys }

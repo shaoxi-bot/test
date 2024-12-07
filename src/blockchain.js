@@ -67,6 +67,7 @@ class Blockchain {
         this.seed.port,
         this.seed.address,
       );
+      this.peers.push(this.seed);
     }
   }
   send(message, port, host) {
@@ -93,6 +94,11 @@ class Blockchain {
           type: "sayhi",
           data: remote
         })
+        // 4. 同步区块链数据
+        this.send({
+          type: 'blockchain',
+          data: JSON.stringify({ blockchain: this.blockchain,trans: this.data }),
+        }, remote.port, remote.address);
 
 
         this.peers.push(remote);
@@ -103,21 +109,84 @@ class Blockchain {
         break;
       case 'peersList':
         const newPeers = action.data;
+        console.log('peersList', newPeers);
         this.addPeers(newPeers)
         break;
       case 'sayhi':
         let remotePeer = action.data;
+        this.peers.push(remotePeer)
         console.log("【信息】新朋友你好，相识就是缘分")
         this.send({ type: 'hi' }, remotePeer.port, remote.address)
         break;
       case 'hi':
-        console.log(`${remote.address}:${remote.port} : ${action.data}`)
+        console.log(`${remote.address}:${remote.port} : ${action.type}`)
         break;
+      case 'blockchain':
+        // 同步区块链
+        let allData = JSON.parse(action.data)
+        let newChain = allData.blockchain;
+        let newTrans = allData.trans;
+        this.replaceChain(newChain)
+        this.replaceTrans(newTrans)
+        break;
+      case 'mine':
+        // 有节点挖矿成功
+        let lastBlock = this.getLastChain();
+        if (lastBlock.hash == action.data.hash) {
+          return
+        }
+        if (this.isValidaBlock(action.data, lastBlock)) {
+          console.log('有节点挖矿成功!')
+          this.blockchain.push(action.data);
+          // 清空本地消息
+          this.data = []
+          this.boardcast({
+            type: 'mine',
+            data: action.data,
+          })
+        } else {
+          console.log('【错误】：区块数据不合法')
+        }
+        break;
+      case 'trans':
+        // 接收到交易请求
+        if (!this.data.find(v => this.isEqualObj(v, action.data))) {
+          console.log('有新的交易产生，请注意查收')
+          this.addTrans(action.data)
+          this.boardcast({
+            type: 'trans',
+            data: action.data,
+          })
+        } else {
+
+        }
+
+        break
       case 'exit':
         console.log('exit', remote);
         break;
       default:
         console.log('未定义类型的消息');
+    }
+  }
+
+  replaceTrans(newTrans) {
+    if (newTrans.every(v => this.isValidaTrans(v))){
+      this.data = newTrans
+    }
+
+    
+  }
+
+  replaceChain(newChain) {
+    if (newChain.length === 1) {
+      return;
+    }
+    if (this.isValidaChain(newChain) && newChain.length > this.blockchain.length) {
+      // if (this.isValidaBlock(newChain) && newChain.length > this.blockchain.length) {
+      this.blockchain = JSON.parse(JSON.stringify(newChain));
+    } else {
+      console.log('【错误】：区块链数据不合法')
     }
   }
 
@@ -127,9 +196,17 @@ class Blockchain {
       this.send(action, v.port, v.address)
     })
   }
+  isEqualObj(obj1, obj2) {
+    const keys1 = Object.keys(obj1);
+    const keys2 = Object.keys(obj2);
+    if (keys1.length !== keys2.length) {
+      return false;
+    }
+    return keys1.every(key => obj1[key] === obj2[key]);
+  }
 
   isEqualPeer(peer1, peer2) {
-    return pee1.address == peer2.address && peer1.port == peer2.port
+    return peer1.address == peer2.address && peer1.port == peer2.port
   }
 
   addPeers(newPeers) {
@@ -161,26 +238,39 @@ class Blockchain {
     return this.blockchain[this.blockchain.length - 1];
   }
 
+  addTrans(trans) {
+    if (this.isValidaTrans(trans)) {
+      this.data.push(trans)
+    }
+  }
+
   // 交易
   transfer(from, to, amount) {
+    const timestamp = new Date().getTime();
+    // 签名
+    // const tranObj = { from, to, amount };
+    const sig = rsa.sign({ from, to, amount, timestamp })
+    const sigTrans = { from, to, amount, timestamp, signature: sig }
     if (from != '0') {
       let blance = this.blance(from);
       if (blance < amount) {
         console.log('not enough blance', from, blance, amount);
         return;
       }
+      this.boardcast({
+        type: 'trans',
+        data: sigTrans,
+      })
     }
-    // 签名校验
-    // const tranObj = { from, to, amount };
-    const sig = rsa.sign({ from, to, amount })
-    const sigTrans = { from, to, amount, sig }
+
+
     this.data.push(sigTrans);
     return sigTrans;
   }
 
-  isValidaTrans(trans){
+  isValidaTrans(trans) {
     // 是不是合法交易
-    return rsa.verify(trans,trans.from)
+    return rsa.verify(trans, trans.from)
   }
 
   // 查看余额p
@@ -212,7 +302,7 @@ class Blockchain {
     // 过滤不合法交易
     this.data = this.data.filter(v => this.isValidaTrans(v))
 
-    this.isValidaTrans()
+    // this.isValidaTrans()
     this.transfer('0', address, 100);
     // 1.生成新区块
     // 2.计算哈希 (直到计算出的哈希符合条件)
@@ -221,6 +311,12 @@ class Blockchain {
     if (this.isValidaBlock(newBlock) && this.isValidaChain()) {
       this.blockchain.push(newBlock);
       this.data = [];
+      // 挖矿成功
+      // 广播挖矿信息
+      this.boardcast({
+        type: 'mine',
+        data: newBlock,
+      })
       return newBlock;
     } else {
       console.log('Error, Invalid Block', newBlock);

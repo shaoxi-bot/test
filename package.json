@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "dev": "node src/index.js"
+    "dev": "node src/index.js",
+    "lint": "eslint --fix -c src/*.js src"
   },
   "dependencies": {
     "cli-table": "^0.3.11",
